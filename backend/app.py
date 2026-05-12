@@ -58,7 +58,7 @@ def process_video():
         if not success:
             break
 
-        results = model(frame)
+        results = model(frame, conf=0.15, verbose=False)
 
         detections = []
 
