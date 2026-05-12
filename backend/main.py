@@ -1,11 +1,20 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from ultralytics import YOLO
 import cv2
+import shutil
 import os
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
@@ -16,23 +25,22 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 model = YOLO("models/best.pt")
 
 
-@app.route("/")
+@app.get("/")
 def home():
-    return {"message": "Salamander YOLO Backend Running"}
+    return {"message": "Salamander YOLO FastAPI Backend Running"}
 
 
-@app.route("/process-video", methods=["POST"])
-def process_video():
-
-    if "video" not in request.files:
-        return jsonify({"error": "No video uploaded"}), 400
-
-    video = request.files["video"]
+@app.post("/process-video")
+async def process_video(video: UploadFile = File(...)):
 
     input_path = os.path.join(UPLOAD_FOLDER, video.filename)
-    output_path = os.path.join(OUTPUT_FOLDER, f"annotated_{video.filename}")
+    output_path = os.path.join(
+        OUTPUT_FOLDER,
+        f"annotated_{video.filename}"
+    )
 
-    video.save(input_path)
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(video.file, buffer)
 
     cap = cv2.VideoCapture(input_path)
 
@@ -58,13 +66,13 @@ def process_video():
         if not success:
             break
 
-        results = model(frame, conf=0.15, verbose=False)
-
-        detections = []
+        results = model(frame)
 
         annotated_frame = results[0].plot()
 
         boxes = results[0].boxes
+
+        detections = []
 
         count = 0
 
@@ -94,16 +102,19 @@ def process_video():
     cap.release()
     out.release()
 
-    return jsonify({
-        "videoUrl": f"/video/{os.path.basename(output_path)}",
+    return {
+        "videoUrl": f"/video/annotated_{video.filename}",
         "metrics": frame_data
-    })
+    }
 
 
-@app.route("/video/<filename>")
-def get_video(filename):
-    return send_from_directory(OUTPUT_FOLDER, filename)
+@app.get("/video/{filename}")
+def get_video(filename: str):
 
+    file_path = os.path.join(OUTPUT_FOLDER, filename)
 
-if __name__ == "__main__":
-    app.run(debug=True)
+    return FileResponse(
+        file_path,
+        media_type="video/mp4",
+        filename=filename
+    )
