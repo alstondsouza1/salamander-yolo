@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Backend generated files
+backend/uploads/
+backend/outputs/
+
+# YOLO generated runs/results
+runs/
+*/runs/
+
+# OS files
+.DS_Store
+
+# Node / React later
+node_modules/
+dist/
+.env.local

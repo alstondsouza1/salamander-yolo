@@ -1,0 +1,7 @@
+path: /Users/alston/Desktop/SDEV 378/salamander-yolo/dataset
+
+train: images/train
+val: images/val
+
+names:
+  0: salamander
