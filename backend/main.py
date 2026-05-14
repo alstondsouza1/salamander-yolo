@@ -33,10 +33,24 @@ def home():
 @app.post("/process-video")
 async def process_video(video: UploadFile = File(...)):
 
-    input_path = os.path.join(UPLOAD_FOLDER, video.filename)
+    # Clean filename
+    safe_filename = (
+        video.filename
+        .replace(" ", "_")
+        .replace("(", "")
+        .replace(")", "")
+    )
+
+    input_path = os.path.join(
+        UPLOAD_FOLDER,
+        safe_filename
+    )
+
+    output_filename = f"annotated_{safe_filename}"
+
     output_path = os.path.join(
         OUTPUT_FOLDER,
-        f"annotated_{video.filename}"
+        output_filename
     )
 
     with open(input_path, "wb") as buffer:
@@ -48,7 +62,8 @@ async def process_video(video: UploadFile = File(...)):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    # Browser-friendly codec
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
 
     out = cv2.VideoWriter(
         output_path,
@@ -103,7 +118,7 @@ async def process_video(video: UploadFile = File(...)):
     out.release()
 
     return {
-        "videoUrl": f"/video/annotated_{video.filename}",
+        "videoUrl": f"/video/{output_filename}",
         "metrics": frame_data
     }
 

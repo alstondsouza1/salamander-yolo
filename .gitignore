@@ -18,6 +18,12 @@ runs/
 # YOLO/cache files
 *.cache
 
+# Generated videos
+*.mp4
+
+# YOLO model weights
+*.pt
+
 # OS files
 .DS_Store
 
@@ -25,3 +31,9 @@ runs/
 node_modules/
 dist/
 .env.local
+
+# Vite cache
+.vite/
+
+# VS Code
+.vscode/
