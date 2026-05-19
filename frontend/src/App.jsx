@@ -1,5 +1,4 @@
 import { useState } from "react";
-import axios from "axios";
 import "./App.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -7,7 +6,8 @@ const API_BASE_URL = "http://127.0.0.1:8000";
 function App() {
   const [videoFile, setVideoFile] = useState(null);
   const [result, setResult] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [status, setStatus] = useState("idle");
+  const [percent, setPercent] = useState(0);
   const [error, setError] = useState("");
 
   async function handleSubmit(event) {
@@ -18,7 +18,8 @@ function App() {
       return;
     }
 
-    setIsProcessing(true);
+    setStatus("processing");
+    setPercent(0);
     setError("");
     setResult(null);
 
@@ -26,31 +27,54 @@ function App() {
     formData.append("video", videoFile);
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/process-video`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const uploadResponse = await fetch(`${API_BASE_URL}/track`, {
+        method: "POST",
+        body: formData,
+      });
 
-      setResult(response.data);
+      if (!uploadResponse.ok) {
+        throw new Error("Upload failed.");
+      }
+
+      pollJobStatus();
     } catch (err) {
       console.error(err);
-      setError("Something went wrong while processing the video.");
-    } finally {
-      setIsProcessing(false);
+      setError("Something went wrong while uploading the video.");
+      setStatus("error");
     }
   }
 
-  const totalFrames = result?.metrics?.length || 0;
-  const framesWithDetections =
-    result?.metrics?.filter((frame) => frame.count > 0).length || 0;
+  function pollJobStatus() {
+    const intervalId = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/track`);
+        const data = await response.json();
 
-  const maxCount =
-    result?.metrics?.reduce((max, frame) => Math.max(max, frame.count), 0) || 0;
+        setStatus(data.status);
+        setPercent(data.percent || 0);
+
+        if (data.status === "done") {
+          clearInterval(intervalId);
+          setResult(data.result);
+          setPercent(100);
+        }
+
+        if (data.status === "error") {
+          clearInterval(intervalId);
+          setError(data.message || "Tracking failed.");
+        }
+      } catch (err) {
+        clearInterval(intervalId);
+        console.error(err);
+        setError("Could not check job progress.");
+        setStatus("error");
+      }
+    }, 1000);
+  }
+
+  const totalFrames = result?.summary?.totalFrames || 0;
+  const framesWithDetections = result?.summary?.framesWithDetections || 0;
+  const maxCount = result?.summary?.maxSimultaneousDetections || 0;
 
   const firstDetection = result?.metrics?.find(
     (frame) => frame.detections.length > 0
@@ -62,8 +86,8 @@ function App() {
         <p className="eyebrow">Applied AI Project</p>
         <h1>Salamander YOLO Tracker</h1>
         <p className="subtitle">
-          Upload a salamander video, run YOLO detection, and view an annotated
-          video with detection metrics.
+          Upload a video, run YOLO tracking, and view an annotated video with
+          per-salamander metrics.
         </p>
       </section>
 
@@ -77,12 +101,20 @@ function App() {
             onChange={(event) => setVideoFile(event.target.files[0])}
           />
 
-          <button type="submit" disabled={isProcessing}>
-            {isProcessing ? "Processing..." : "Process Video"}
+          <button type="submit" disabled={status === "processing"}>
+            {status === "processing" ? "Processing..." : "Process Video"}
           </button>
         </form>
 
         {videoFile && <p className="file-name">Selected: {videoFile.name}</p>}
+
+        {status === "processing" && (
+          <div className="progress-area">
+            <p>Processing video... {percent}%</p>
+            <progress value={percent} max="100"></progress>
+          </div>
+        )}
+
         {error && <p className="error">{error}</p>}
       </section>
 
@@ -125,6 +157,34 @@ function App() {
                 <p>No detections found</p>
               )}
             </div>
+          </section>
+
+          <section className="card">
+            <h2>Per-Salamander Metrics</h2>
+
+            <table className="tracks-table">
+              <thead>
+                <tr>
+                  <th>Track ID</th>
+                  <th>Label</th>
+                  <th>Time on Screen</th>
+                  <th>Frames Seen</th>
+                  <th>Total Distance</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {result.tracks.map((track) => (
+                  <tr key={track.trackId}>
+                    <td>{track.trackId}</td>
+                    <td>{track.label}</td>
+                    <td>{track.timeOnScreenSeconds}s</td>
+                    <td>{track.framesSeen}</td>
+                    <td>{track.totalDistancePixels}px</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
 
           <section className="card">

@@ -18,12 +18,6 @@ runs/
 # YOLO/cache files
 *.cache
 
-# Generated videos
-*.mp4
-
-# YOLO model weights
-*.pt
-
 # OS files
 .DS_Store
 

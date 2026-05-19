@@ -1,4 +1,4 @@
-path: /Users/alston/Desktop/SDEV 378/salamander-yolo/dataset
+path: ./dataset
 
 train: images/train
 val: images/val
